@@ -3,6 +3,8 @@
 
 A plugin for [Obsidian](https://obsidian.md/) for inserting and editing [diagrams.net](https://diagrams.net/) (previously draw.io) diagrams. It differs from the [drawio-obsidian](https://github.com/zapthedingbat/drawio-obsidian) plugin in that it embeds the diagrams.net online editor, which requires an active internet connection, but enables the full feature set and all the shape libraries.
 
+![1726331570398-20240915_003106](https://github.com/user-attachments/assets/eb15b6b2-697e-45c4-b21c-b34fa131cb22)
+
 ![1726331811989-20240915_003406](https://github.com/user-attachments/assets/71aced54-474f-430f-afb3-cda153b144e1)
 
 > ## ⚠️ **Caveats**
