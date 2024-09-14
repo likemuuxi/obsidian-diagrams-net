@@ -1,5 +1,5 @@
-import { addIcon, Notice, Plugin, TFile, Vault, Workspace, WorkspaceLeaf, MenuItem, MarkdownView, TAbstractFile, Menu, Editor } from 'obsidian';
-import { DIAGRAM_VIEW_TYPE, ICON } from './constants';
+import { addIcon, Editor, MarkdownView, Menu, MenuItem, Notice, Plugin, TAbstractFile, TFile, Vault, Workspace } from 'obsidian';
+import { ICON } from './constants';
 import DiagramsView from './diagrams-view';
 
 
@@ -8,34 +8,42 @@ export default class DiagramsNet extends Plugin {
 	vault: Vault;
 	workspace: Workspace;
 	diagramsView: DiagramsView;
+	ui: string;
 
 	async onload() {
 
 		this.vault = this.app.vault;
 		this.workspace = this.app.workspace;
 
-		addIcon("diagram", ICON);
-
-		this.registerView(
-			DIAGRAM_VIEW_TYPE,
-			(leaf: WorkspaceLeaf) => (
-				this.diagramsView = new DiagramsView(
-					leaf, null, {
-					path: this.activeLeafPath(this.workspace),
-					basename: this.activeLeafName(this.workspace),
-					svgPath: '',
-					xmlPath: '',
-					diagramExists: false,
-				})
-			)
+		this.registerEvent(
+			this.app.workspace.on('css-change', () => {
+				this.handleThemeChange();
+			})
 		);
+
+		this.handleThemeChange();
+
+		this.registerDomEvent(document, 'dblclick', (evt: MouseEvent) => {
+			const target = evt.target as HTMLElement;
+			if (target.tagName.toLowerCase() === 'img') {
+				const altText = target.getAttribute('alt');
+				if (altText && altText.endsWith('.svg')) {
+					const file = this.app.metadataCache.getFirstLinkpathDest(altText, '');
+					if (file instanceof TFile) {
+						this.attemptEditDiagram(file);
+					}
+				}
+			}
+		});
+
+		addIcon("diagram", ICON);
 
 		this.addCommand({
 			id: 'app:diagrams-net-new-diagram',
 			name: 'New diagram',
 			checkCallback: (checking: boolean) => {
-				const leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (view) {
 					if (!checking) {
 						this.attemptNewDiagram()
 					}
@@ -63,6 +71,11 @@ export default class DiagramsNet extends Plugin {
 
 	}
 
+	handleThemeChange() {
+		const isDarkMode = document.body.classList.contains('theme-dark');
+		this.ui = isDarkMode ? '&ui=dark' : '&ui=min';
+	}
+
 	isFileValidDiagram(file: TAbstractFile) {
 		let itIs = false
 		if (file instanceof TFile && file.extension === 'svg') {
@@ -79,16 +92,17 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	activeLeafPath(workspace: Workspace) {
-		return workspace.activeLeaf?.view.getState().file;
+		const view = workspace.getActiveViewOfType(MarkdownView);
+		return view?.getState().file;
 	}
 
 	activeLeafName(workspace: Workspace) {
-		return workspace.activeLeaf?.getDisplayText();
+		return workspace.getActiveViewOfType(MarkdownView)?.getDisplayText();
 	}
 
 	async availablePath() {
 		// @ts-ignore: Type not documented.
-		const base = await this.vault.getAvailablePathForAttachments('Diagram', 'svg')
+		const base = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
 		return {
 			svgPath: base,
 			xmlPath: this.getXmlPath(base)
@@ -126,17 +140,8 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	async initView(fileInfo: any) {
-		if (this.app.workspace.getLeavesOfType(DIAGRAM_VIEW_TYPE).length > 0) {
-			return
-		}
 		const hostView = this.workspace.getActiveViewOfType(MarkdownView);
-
-		const leaf = this.app.workspace.splitActiveLeaf('horizontal')
-		// TODO: Replace splitActiveLeaf with getLeaf, when official version => 0.15.
-		// const leaf = this.app.workspace.getLeaf(true, 'horizontal')
-
-		const diagramView = new DiagramsView(leaf, hostView, fileInfo)
-		leaf.open(diagramView)
+		new DiagramsView(this.app, hostView, fileInfo, this.ui).open();
 	}
 
 	handleDeleteFile(file: TAbstractFile) {

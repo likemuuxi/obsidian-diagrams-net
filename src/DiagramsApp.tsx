@@ -3,14 +3,13 @@ import useDiagramsNet from './useDiagramsNet';
 
 
 export const DiagramsApp = (props: any) => {
-
-
     const {
         xmlPath,
         diagramExists,
         vault,
         handleExit,
         handleSaveAndExit,
+        ui
     } = props
 
     const [xmlData, setXmlData] = React.useState(null)
@@ -19,8 +18,8 @@ export const DiagramsApp = (props: any) => {
         handleSaveAndExit,
         handleExit,
         () => "",
-        () => xmlData)
-
+        () => xmlData,
+        ui)
 
     const loadXmlData = async () => {
         const xmlFile = vault.getAbstractFileByPath(xmlPath)
@@ -42,6 +41,6 @@ export const DiagramsApp = (props: any) => {
         }
     }, [xmlData])
 
-    return <div id="drawIoDiagramFrame" />
+    return <div id="drawIoDiagramFrame" className="modal-content diagrams-modal" />;
 
 };
