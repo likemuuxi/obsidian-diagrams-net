@@ -1,4 +1,4 @@
-import { App, MarkdownView, Modal, TFile, Vault, View, Workspace } from 'obsidian';
+import { App, MarkdownView, Modal, TFile, Vault, View, Workspace, Notice } from 'obsidian';
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { DIAGRAM_VIEW_TYPE } from './constants';
@@ -41,6 +41,16 @@ export default class DiagramsView extends Modal {
 
 
     async onOpen() {
+
+        const modalBgElement = document.querySelector(".modal-bg") as HTMLElement;
+        if (modalBgElement) {
+            modalBgElement.addEventListener("click", (event) => {
+                if (event.target === modalBgElement) {
+                    event.stopImmediatePropagation();
+                    event.preventDefault();
+                }
+            }, true);
+        }
 
         const handleExit = async () => {
             close()

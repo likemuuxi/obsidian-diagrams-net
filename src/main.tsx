@@ -26,14 +26,16 @@ export default class DiagramsNet extends Plugin {
 		this.registerDomEvent(document, 'dblclick', (evt: MouseEvent) => {
 			const target = evt.target as HTMLElement;
 			if (target.tagName.toLowerCase() === 'img') {
-				const altText = target.getAttribute('alt');
-				if (altText && altText.endsWith('.svg')) {
-					const file = this.app.metadataCache.getFirstLinkpathDest(altText, '');
+				const src = target.getAttribute('src');
+				const fileName = src.match(/\/([^/?]+\.svg)/)?.[1];
+				if (fileName && fileName.endsWith('.svg')) {
+					const file = this.app.metadataCache.getFirstLinkpathDest(fileName, '');
 					if (file instanceof TFile) {
 						this.attemptEditDiagram(file);
 					}
 				}
 			}
+			
 		});
 
 		addIcon("diagram", ICON);
