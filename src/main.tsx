@@ -24,18 +24,20 @@ export default class DiagramsNet extends Plugin {
 		this.handleThemeChange();
 
 		this.registerDomEvent(document, 'dblclick', (evt: MouseEvent) => {
-			const target = evt.target as HTMLElement;
-			if (target.tagName.toLowerCase() === 'img') {
-				const src = target.getAttribute('src');
-				const fileName = src.match(/\/([^/?]+\.svg)/)?.[1];
-				if (fileName && fileName.endsWith('.svg')) {
-					const file = this.app.metadataCache.getFirstLinkpathDest(fileName, '');
+			let target = evt.target as HTMLElement;
+			if (target.tagName === "IMG" && target.parentElement?.classList.contains("internal-embed")) {
+				target = target.parentElement;
+			}
+			if (target.classList.contains("internal-embed")) {
+				const src = target.getAttribute("src");
+				if (src && src.endsWith(".svg")) {
+					const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
 					if (file instanceof TFile) {
 						this.attemptEditDiagram(file);
 					}
 				}
 			}
-			
+
 		});
 
 		addIcon("diagram", ICON);
