@@ -44,7 +44,7 @@ export default class DiagramsView extends Modal {
 
         const modalBgElement = document.querySelector(".modal-bg") as HTMLElement;
         if (modalBgElement) {
-            modalBgElement.addEventListener("click", (event) => {
+            modalBgElement.addEventListener("click", async (event) => {
                 if (event.target === modalBgElement) {
                     event.stopImmediatePropagation();
                     event.preventDefault();
@@ -59,14 +59,12 @@ export default class DiagramsView extends Modal {
         const handleSaveAndExit = async (msg: any) => {
             if (this.diagramExists) {
                 saveData(msg)
-                refreshMarkdownViews()
-                close()
-            }
-            else {
+                await refreshMarkdownViews()
+            } else {
                 saveData(msg)
                 insertDiagram()
-                close()
             }
+            close()
         }
 
         const close = () => {

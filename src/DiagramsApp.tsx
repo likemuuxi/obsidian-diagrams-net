@@ -12,7 +12,7 @@ export const DiagramsApp = (props: any) => {
         ui
     } = props
 
-    const [xmlData, setXmlData] = React.useState(null)
+    const [xmlData, setXmlData] = React.useState(null);
 
     const { startEditing } = useDiagramsNet(
         handleSaveAndExit,

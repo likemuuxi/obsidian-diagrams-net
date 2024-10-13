@@ -37,7 +37,25 @@ export default class DiagramsNet extends Plugin {
 					}
 				}
 			}
+		});
 
+		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+			if (!evt.altKey) return; // 只在按住 Alt 键时处理
+		
+			let target = evt.target as HTMLElement;
+			if (target.tagName === "IMG" && target.parentElement?.classList.contains("internal-embed")) {
+				target = target.parentElement;
+			}
+			if (target.classList.contains("internal-embed")) {
+				const src = target.getAttribute("src");
+				if (src && src.endsWith(".svg")) {
+					const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
+					if (file instanceof TFile) {
+						this.attemptEditDiagram(file);
+						evt.preventDefault(); // 阻止默认行为
+					}
+				}
+			}
 		});
 
 		addIcon("diagram", ICON);
