@@ -52,7 +52,7 @@ export default class DiagramsNet extends Plugin {
 					const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
 					if (file instanceof TFile) {
 						this.attemptEditDiagram(file);
-						evt.preventDefault(); // 阻止默认行为
+						// evt.preventDefault(); // 阻止默认行为
 					}
 				}
 			}

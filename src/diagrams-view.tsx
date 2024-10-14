@@ -102,29 +102,16 @@ export default class DiagramsView extends Modal {
                     view.previewMode.rerender(true);
                 }, 100);
             } else if (view.getMode() === "source") {
-                const editView = view.currentMode;
-                if (editView && typeof editView.getScroll === 'function') {
-                    scrollPosition = editView.getScroll();
-                } else if (view.editor) {
-                    scrollPosition = view.editor.getScrollInfo();
-                }
-                // refresh the editView.
-                const editor = view.editor;
-                const content = editor.getValue();
-                // 第一步：移除所有 ![[]] 中的感叹号
-                const modifiedContent = content.replace(/!\[\[(.+?)\]\]/g, '[[$1]]');
-                editor.setValue(modifiedContent);
-                
-                // 第二步：重新添加感叹号到原本是 ![[]] 的链接
+                const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
+                const cursor = editor.getCursor();
+                const line = editor.getLine(cursor.line);
+                const match = line.match(/\[\[.*?\]\]/);
+                if (!match) return;
+                const modifiedLine = line.replace(/\!\[\[/, '[[');
+                editor.replaceRange(modifiedLine, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: line.length });
                 setTimeout(() => {
-                    const finalContent = editor.getValue().replace(/\[\[(.+?)\]\]/g, (match, p1) => {
-                        // 检查原始内容中是否存在 ![[p1]]
-                        return content.includes(`![[${p1}]]`) ? `![[${p1}]]` : `[[${p1}]]`;
-                    });
-                    editor.setValue(finalContent);
-                    // 保持光标位置不变
-                    const cursor = editor.getCursor();
-                    editor.setCursor(cursor);
+                    const finalLine = modifiedLine.replace(/\[\[/, '![[');
+                    editor.replaceRange(finalLine, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: modifiedLine.length });
                 }, 100);
             }
 
