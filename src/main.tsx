@@ -1,7 +1,8 @@
-import { addIcon, Editor, MarkdownView, Menu, MenuItem, Notice, Plugin, TAbstractFile, TFile, Vault, Workspace } from 'obsidian';
+import { addIcon, Editor, MarkdownView, Notice, Plugin, TAbstractFile, TFile, Vault, Workspace, Menu, MenuItem } from 'obsidian';
+import { normalizePath } from 'obsidian'
 import { ICON } from './constants';
 import DiagramsView from './diagrams-view';
-
+import { DEFAULT_SETTINGS, DiagramsSettings, DiagramsSettingsTab } from "./settings";
 
 export default class DiagramsNet extends Plugin {
 
@@ -9,11 +10,14 @@ export default class DiagramsNet extends Plugin {
 	workspace: Workspace;
 	diagramsView: DiagramsView;
 	ui: string;
+	settings: DiagramsSettings;
 
 	async onload() {
-
 		this.vault = this.app.vault;
 		this.workspace = this.app.workspace;
+
+		await this.loadSettings();
+		this.addSettingTab(new DiagramsSettingsTab(this.app, this));
 
 		this.registerEvent(
 			this.app.workspace.on('css-change', () => {
@@ -79,13 +83,13 @@ export default class DiagramsNet extends Plugin {
 
 		// this.addRibbonIcon("diagram", "Insert new diagram", () => this.attemptNewDiagram() );
 
-		this.registerEvent(
-			this.app.workspace.on("file-menu", this.handleFileMenu, this)
-		);
+		// this.registerEvent(
+		// 	this.app.workspace.on("file-menu", this.handleFileMenu, this)
+		// );
 
-		this.registerEvent(
-			this.app.workspace.on("editor-menu", this.handleEditorMenu, this)
-		);
+		// this.registerEvent(
+		// 	this.app.workspace.on("editor-menu", this.handleEditorMenu, this)
+		// );
 
 
 		this.registerEvent(this.app.vault.on('rename', (file, oldname) => this.handleRenameFile(file, oldname)));
@@ -110,7 +114,7 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	getXmlPath(path: string) {
-		return (path + '.xml')
+		return path.endsWith('.svg') ? path.slice(0, -4) + '.xml' : path + '.xml';
 	}
 
 	activeLeafPath(workspace: Workspace) {
@@ -123,13 +127,64 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	async availablePath() {
-		// @ts-ignore: Type not documented.
-		const base = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
-		return {
-			svgPath: base,
-			xmlPath: this.getXmlPath(base)
+		let basePath: string;
+		
+		// 确保路径格式正确
+		switch (this.settings.defaultLocation) {
+			case 'default':
+				// @ts-ignore: Type not documented.
+				basePath = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
+				break;
+			case 'current':
+				// 当前文件路径
+				const activeFile = this.workspace.getActiveFile();
+				if (activeFile) {
+					const folderPath = activeFile.parent.path;  // 获取当前文件夹路径
+					basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
+				} else {
+					throw new Error('No active file found for the current location setting.');
+				}
+				break;
+			case 'custom':
+				// 自定义路径
+				const customPath = this.settings.customPath || '';
+				if (!customPath.trim()) {
+					throw new Error('Custom path setting is empty. Please specify a valid path.');
+				}
+				// @ts-ignore: Type not documented.
+				const folderPath = normalizePath(customPath);
+				// 路径检查
+				const folder = this.app.vault.getFolderByPath(folderPath);
+				if (!folder) {
+					new Notice("The path setting does not exist");
+					throw new Error(`The specified custom path does not exist: ${folderPath}`);
+				}
+				basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
+				break;
+			default:
+				throw new Error('Invalid default location setting.');
 		}
+	
+		return {
+			svgPath: basePath,
+			xmlPath: this.getXmlPath(basePath),
+		};
 	}
+	
+	async getAvailablePath(filename: string, extension: string, folderPath?: string): Promise<string> {
+		const path = folderPath ? folderPath : this.vault.configDir;
+		let basePath = `${path}/${filename}.${extension}`;
+		
+		// 这里检查文件是否已经存在
+		let counter = 1;
+		while (await this.vault.adapter.exists(basePath)) {
+			basePath = `${path}/${filename} (${counter}).${extension}`;
+			counter++;
+		}
+		
+		return basePath;
+	}
+	
 
 	async attemptNewDiagram() {
 		const { svgPath, xmlPath } = await this.availablePath()
@@ -158,12 +213,11 @@ export default class DiagramsNet extends Plugin {
 			};
 			this.initView(fileInfo);
 		}
-
 	}
 
 	async initView(fileInfo: any) {
 		const hostView = this.workspace.getActiveViewOfType(MarkdownView);
-		new DiagramsView(this.app, hostView, fileInfo, this.ui).open();
+		new DiagramsView(this.app, hostView, fileInfo, this.ui, this.settings).open();
 	}
 
 	handleDeleteFile(file: TAbstractFile) {
@@ -207,6 +261,14 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	async onunload() {
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 }
