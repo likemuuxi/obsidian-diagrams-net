@@ -4,7 +4,7 @@ export default {
   CURRENT_FOLDER: 'Current folder',
   DEFAULT_FOLDER: 'Default folder',
   CUSTOM_PATH: 'Custom path',
-  CREATE_AND_RENAME: 'Create and rename',
+  CREATE_AND_RENAME: 'Save the new file and rename it',
   RENAME: 'Rename',
   CANCEL: 'Cancel'
 }
