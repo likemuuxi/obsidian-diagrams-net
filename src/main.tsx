@@ -80,17 +80,15 @@ export default class DiagramsNet extends Plugin {
 			hotkeys: []
 		});
 
+		this.addRibbonIcon("diagram", "Insert new diagram", () => this.attemptNewDiagram() );
 
-		// this.addRibbonIcon("diagram", "Insert new diagram", () => this.attemptNewDiagram() );
+		this.registerEvent(
+			this.app.workspace.on("file-menu", this.handleFileMenu, this)
+		);
 
-		// this.registerEvent(
-		// 	this.app.workspace.on("file-menu", this.handleFileMenu, this)
-		// );
-
-		// this.registerEvent(
-		// 	this.app.workspace.on("editor-menu", this.handleEditorMenu, this)
-		// );
-
+		this.registerEvent(
+			this.app.workspace.on("editor-menu", this.handleEditorMenu, this)
+		);
 
 		this.registerEvent(this.app.vault.on('rename', (file, oldname) => this.handleRenameFile(file, oldname)));
 		this.registerEvent(this.app.vault.on('delete', (file) => this.handleDeleteFile(file)));
@@ -114,8 +112,40 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	getXmlPath(path: string) {
-		return path.endsWith('.svg') ? path.slice(0, -4) + '.xml' : path + '.xml';
-	}
+		let xmlPath;
+		if (path.endsWith('.svg')) {
+			// 如果路径包含目录，去掉 `.svg` 后缀并返回 `.xml` 文件路径
+			xmlPath = path.includes('/') ? path.slice(0, -4) + '.xml' : path.slice(0, -4) + '.svg.xml';
+		}
+		console.log(xmlPath);
+		return xmlPath;
+	}	
+
+	// getXmlPath(path: string) {
+	// 	// 处理路径中的 URL 编码
+	// 	const normalizedPath = decodeURIComponent(path);
+	
+	// 	// 判断路径是否是以 `.svg` 结尾
+	// 	if (normalizedPath.endsWith('.svg')) {
+	// 		let xmlPath;
+			
+	// 		// 如果路径包含目录信息，去掉 `.svg` 后缀并返回对应的 `.xml` 文件路径
+	// 		if (normalizedPath.includes('/')) {
+	// 			console.log("1111");
+	// 			xmlPath = normalizedPath.slice(0, -4) + '.xml'; // 保留目录结构，换为 .xml 文件
+	// 		} else {
+	// 			console.log("1111");
+	// 			// 如果只是文件名，返回默认路径（假设默认目录为当前目录）
+	// 			// @ts-ignore: Type not documented.
+	// 			const basePath = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
+	// 			xmlPath = basePath + normalizedPath.slice(0, -4) + '.svg.xml';
+	// 		}
+	
+	// 		// 打印找到的 XML 路径
+	// 		console.log("Generated XML Path:", xmlPath);
+	// 		return xmlPath;
+	// 	}
+	// }
 
 	activeLeafPath(workspace: Workspace) {
 		const view = workspace.getActiveViewOfType(MarkdownView);
