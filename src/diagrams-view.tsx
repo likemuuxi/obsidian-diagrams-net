@@ -1,4 +1,4 @@
-import { App, MarkdownView, Modal, TFile, Vault, View, Workspace, Notice } from 'obsidian';
+import { App, MarkdownView, Modal, TFile, Vault, View, Workspace, Notice, Platform } from 'obsidian';
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { DIAGRAM_VIEW_TYPE } from './constants';
@@ -102,13 +102,55 @@ export default class DiagramsView extends Modal {
                 }
             }
         };
+
+        // const saveData = async (msg: any) => {
+        //     try {
+        //         const base64Data = msg.svgMsg.data.replace('data:image/svg+xml;base64,', '');
+                
+        //         // 将base64数据转换为二进制格式（现代浏览器推荐方式）
+        //         const response = await fetch(`data:application/octet-stream;base64,${base64Data}`);
+        //         const uint8Array = new Uint8Array(await response.arrayBuffer());
+        
+        //         if (this.diagramExists) {
+        //             // 已存在图表时的更新逻辑
+        //             const svgFile = this.vault.getAbstractFileByPath(this.svgPath);
+        //             const xmlFile = this.vault.getAbstractFileByPath(this.xmlPath);
+        //             if (!(svgFile instanceof TFile && xmlFile instanceof TFile)) return;
+                    
+        //             await this.vault.modifyBinary(svgFile, uint8Array);
+        //             await this.vault.modify(xmlFile, msg.svgMsg.xml);
+        //         } else {
+        //             // 新图表创建逻辑
+        //             const svgFile = await this.vault.createBinary(this.svgPath, uint8Array);
+        //             const xmlFile = await this.vault.create(this.xmlPath, msg.svgMsg.xml);
+        //             if (
+        //                 svgFile instanceof TFile &&
+        //                 xmlFile instanceof TFile &&
+        //                 this.settings.createAndRename
+        //             ) {
+        //                 // 调用重命名函数并传入文件路径
+        //                 await renameFiles(svgFile.path, xmlFile.path);
+        //             }
+        //         }
+        //     } catch (error) {
+        //         // 错误处理（建议优化为模板字符串）
+        //         new Notice(`Save failed: ${error}`);
+        //     }
+        // };
         
         const renameFiles = async (svgPath: string, xmlPath: string) => {
             const newName = await promptForNewName(this.fileName);  // 弹出模态框获取新名称
             if (!newName) return;  // 如果没有输入新名称，直接返回
-            
-            const newSvgPath = `${this.vault.getAbstractFileByPath(svgPath)?.parent.path}/${newName}.svg`;
-            const newXmlPath = `${this.vault.getAbstractFileByPath(xmlPath)?.parent.path}/${newName}.xml`;
+            const basePath = this.vault.getAbstractFileByPath(svgPath)?.parent.path;
+
+            let newSvgPath, newXmlPath;
+            if(basePath == '/') {
+                newSvgPath = `${newName}.svg`;
+                newXmlPath = `${newName}.xml`;
+            } else {
+                newSvgPath = `${basePath}/${newName}.svg`;
+                newXmlPath = `${basePath}/${newName}.xml`;
+            }
             
             const svgFile = this.vault.getAbstractFileByPath(svgPath);
             const xmlFile = this.vault.getAbstractFileByPath(xmlPath);

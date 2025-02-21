@@ -121,32 +121,6 @@ export default class DiagramsNet extends Plugin {
 		return xmlPath;
 	}	
 
-	// getXmlPath(path: string) {
-	// 	// 处理路径中的 URL 编码
-	// 	const normalizedPath = decodeURIComponent(path);
-	
-	// 	// 判断路径是否是以 `.svg` 结尾
-	// 	if (normalizedPath.endsWith('.svg')) {
-	// 		let xmlPath;
-			
-	// 		// 如果路径包含目录信息，去掉 `.svg` 后缀并返回对应的 `.xml` 文件路径
-	// 		if (normalizedPath.includes('/')) {
-	// 			console.log("1111");
-	// 			xmlPath = normalizedPath.slice(0, -4) + '.xml'; // 保留目录结构，换为 .xml 文件
-	// 		} else {
-	// 			console.log("1111");
-	// 			// 如果只是文件名，返回默认路径（假设默认目录为当前目录）
-	// 			// @ts-ignore: Type not documented.
-	// 			const basePath = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
-	// 			xmlPath = basePath + normalizedPath.slice(0, -4) + '.svg.xml';
-	// 		}
-	
-	// 		// 打印找到的 XML 路径
-	// 		console.log("Generated XML Path:", xmlPath);
-	// 		return xmlPath;
-	// 	}
-	// }
-
 	activeLeafPath(workspace: Workspace) {
 		const view = workspace.getActiveViewOfType(MarkdownView);
 		return view?.getState().file;
@@ -172,27 +146,32 @@ export default class DiagramsNet extends Plugin {
 					const folderPath = activeFile.parent.path;  // 获取当前文件夹路径
 					basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
 				} else {
-					throw new Error('No active file found for the current location setting.');
+					new Notice('No active file found for the current location setting.');
 				}
 				break;
 			case 'custom':
 				// 自定义路径
 				const customPath = this.settings.customPath || '';
 				if (!customPath.trim()) {
-					throw new Error('Custom path setting is empty. Please specify a valid path.');
+					new Notice('Custom path setting is empty. Please specify a valid path.');
+					return;
 				}
 				// @ts-ignore: Type not documented.
 				const folderPath = normalizePath(customPath);
 				// 路径检查
-				const folder = this.app.vault.getFolderByPath(folderPath);
-				if (!folder) {
-					new Notice("The path setting does not exist");
-					throw new Error(`The specified custom path does not exist: ${folderPath}`);
+				let folder = this.app.vault.getFolderByPath(folderPath);
+				if(customPath == '/') {
+					folder = this.vault.getRoot();
 				}
-				basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
+				if (!folder) {
+					basePath = "";
+					new Notice(`The specified custom path does not exist: ${folderPath}`);
+				} else {
+					basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
+				}
 				break;
 			default:
-				throw new Error('Invalid default location setting.');
+				new Notice('Invalid default location setting.');
 		}
 	
 		return {
@@ -203,27 +182,40 @@ export default class DiagramsNet extends Plugin {
 	
 	async getAvailablePath(filename: string, extension: string, folderPath?: string): Promise<string> {
 		const path = folderPath ? folderPath : this.vault.configDir;
-		let basePath = `${path}/${filename}.${extension}`;
-		
+		let basePath;
+
+		if (path == '/') {
+			basePath = `${filename}.${extension}`;
+		} else {
+			basePath = `${path}/${filename}.${extension}`;
+		}
 		// 这里检查文件是否已经存在
 		let counter = 1;
 		while (await this.vault.adapter.exists(basePath)) {
-			basePath = `${path}/${filename} (${counter}).${extension}`;
+			if (path == '/') {
+				basePath = `${filename} (${counter}).${extension}`;
+			} else {
+				basePath = `${path}/${filename} (${counter}).${extension}`;
+			}
 			counter++;
 		}
-		
 		return basePath;
 	}
 	
 
 	async attemptNewDiagram() {
 		const { svgPath, xmlPath } = await this.availablePath()
+
+		if(!svgPath) {
+			return;
+		}
+
 		const fileInfo = {
 			path: this.activeLeafPath(this.workspace),
 			basename: this.activeLeafName(this.workspace),
-			diagramExists: false,
 			svgPath,
-			xmlPath
+			xmlPath,
+			diagramExists: false
 		};
 		this.initView(fileInfo);
 	}
@@ -232,8 +224,7 @@ export default class DiagramsNet extends Plugin {
 	attemptEditDiagram(svgFile: TFile) {
 		if (!this.isFileValidDiagram(svgFile)) {
 			new Notice('Diagram is not valid. (Missing .xml data)');
-		}
-		else {
+		} else {
 			const fileInfo = {
 				path: this.activeLeafPath(this.workspace),
 				basename: this.activeLeafName(this.workspace),
