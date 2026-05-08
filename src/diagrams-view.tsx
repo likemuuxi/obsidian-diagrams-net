@@ -81,7 +81,10 @@ export default class DiagramsView extends Modal {
         const saveData = async (msg: any, onCreate?: (svgPath: string, xmlPath: string) => Promise<void>) => {
             const svgData = msg.svgMsg.data;
             const svgBuffer = Buffer.from(svgData.replace('data:image/svg+xml;base64,', ''), 'base64');
-            
+            const svgArrayBuffer = new ArrayBuffer(svgBuffer.length);
+            const uint8Array = new Uint8Array(svgArrayBuffer);
+            uint8Array.set(svgBuffer);
+
             if (this.diagramExists) {
                 // 图表已存在，修改文件
                 const svgFile = this.vault.getAbstractFileByPath(this.svgPath);
@@ -89,11 +92,11 @@ export default class DiagramsView extends Modal {
                 if (!(svgFile instanceof TFile && xmlFile instanceof TFile)) {
                     return;
                 }
-                await this.vault.modifyBinary(svgFile, svgBuffer);
+                await this.vault.modifyBinary(svgFile, svgArrayBuffer);
                 await this.vault.modify(xmlFile, msg.svgMsg.xml);
             } else {
                 // 图表不存在，创建新文件
-                const svgFile = await this.vault.createBinary(this.svgPath, svgBuffer);
+                const svgFile = await this.vault.createBinary(this.svgPath, svgArrayBuffer);
                 const xmlFile = await this.vault.create(this.xmlPath, msg.svgMsg.xml);
 
                 // 确保文件成功创建后立刻执行重命名
