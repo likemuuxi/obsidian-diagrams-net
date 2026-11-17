@@ -1,5 +1,3 @@
-export const DIAGRAM_VIEW_TYPE = 'diagrams-net';
-export const MD_VIEW_TYPE = 'markdown'; 
 export const ICON = `<svg
 version="1.1"
 viewBox="0 0 100 100"

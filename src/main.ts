@@ -1,5 +1,4 @@
-import { addIcon, Editor, MarkdownView, Notice, Plugin, TAbstractFile, TFile, Vault, Workspace, Menu, MenuItem } from 'obsidian';
-import { normalizePath } from 'obsidian'
+import { addIcon, Editor, MarkdownView, Notice, normalizePath, Plugin, TAbstractFile, TFile, Vault, Workspace, Menu, MenuItem } from 'obsidian';
 import { ICON } from './constants';
 import DiagramsView from './diagrams-view';
 import { DEFAULT_SETTINGS, DiagramsSettings, DiagramsSettingsTab } from "./settings";
@@ -8,7 +7,6 @@ export default class DiagramsNet extends Plugin {
 
 	vault: Vault;
 	workspace: Workspace;
-	diagramsView: DiagramsView;
 	ui: string;
 	settings: DiagramsSettings;
 
@@ -28,43 +26,13 @@ export default class DiagramsNet extends Plugin {
 		this.handleThemeChange();
 
 		this.registerDomEvent(document, 'dblclick', (evt: MouseEvent) => {
-			let target = evt.target as HTMLElement;
-			if (target.tagName === "IMG") {
-				const match = target.closest(".internal-embed");
-				if (match) {
-					target = match as HTMLElement;
-				}
-			}
-			if (target.classList.contains("internal-embed")) {
-				const src = target.getAttribute("src");
-				if (src && src.endsWith(".svg")) {
-					const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
-					if (file instanceof TFile) {
-						this.attemptEditDiagram(file);
-					}
-				}
-			}
+			this.handleEmbedClick(evt);
 		});
 
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			if (!evt.altKey) return; // 只在按住 Alt 键时处理
-		
-			let target = evt.target as HTMLElement;
-			if (target.tagName === "IMG") {
-				const match = target.closest(".internal-embed");
-				if (match) {
-					target = match as HTMLElement;
-				}
-			}
-			if (target.classList.contains("internal-embed")) {
-				const src = target.getAttribute("src");
-				if (src && src.endsWith(".svg")) {
-					const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
-					if (file instanceof TFile) {
-						this.attemptEditDiagram(file);
-						// evt.preventDefault(); // 阻止默认行为
-					}
-				}
+			// 按住 Alt 键点击时编辑嵌入图表
+			if (evt.altKey) {
+				this.handleEmbedClick(evt);
 			}
 		});
 
@@ -103,89 +71,100 @@ export default class DiagramsNet extends Plugin {
 
 	handleThemeChange() {
 		const isDarkMode = document.body.classList.contains('theme-dark');
-		this.ui = isDarkMode ? '&ui=dark' : '&ui=min';
+		this.ui = isDarkMode ? '&ui=min&dark=1' : '&ui=min';
+	}
+
+	// 处理笔记中嵌入图表的点击/双击编辑；src 可能带别名或子路径，如 diagram.svg|300
+	handleEmbedClick(evt: MouseEvent) {
+		let target = evt.target as HTMLElement;
+		if (target.tagName === "IMG") {
+			const match = target.closest(".internal-embed");
+			if (match) {
+				target = match as HTMLElement;
+			}
+		}
+		if (!target.classList || !target.classList.contains("internal-embed")) {
+			return;
+		}
+		const src = (target.getAttribute("src") || "").split('|')[0].split('#')[0].trim();
+		if (src.toLowerCase().endsWith('.svg')) {
+			const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
+			if (file instanceof TFile) {
+				this.attemptEditDiagram(file);
+			}
+		}
 	}
 
 	isFileValidDiagram(file: TAbstractFile) {
-		let itIs = false
-		if (file instanceof TFile && file.extension === 'svg') {
-			const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(file.path));
-			if (xmlFile && xmlFile instanceof TFile && xmlFile.extension === 'xml') {
-				itIs = true
-			}
-		}
-		return itIs
+		return file instanceof TFile
+			&& file.extension === 'svg'
+			&& this.app.vault.getAbstractFileByPath(this.getXmlPath(file.path)) instanceof TFile;
 	}
 
 	getXmlPath(path: string) {
-		let xmlPath;
-		if (path.endsWith('.svg')) {
-			// 如果路径包含目录，去掉 `.svg` 后缀并返回 `.xml` 文件路径
-			xmlPath = path.includes('/') ? path.slice(0, -4) + '.xml' : path.slice(0, -4) + '.svg.xml';
+		if (!path || !path.endsWith('.svg')) {
+			return '';
 		}
-		console.log(xmlPath);
+		const basePath = path.slice(0, -4);
+		const xmlPath = basePath + '.xml';
+		const legacyPath = basePath + '.svg.xml';
+		// 统一使用 .xml；兼容旧版本在根目录生成的 .svg.xml
+		if (this.app.vault.getAbstractFileByPath(xmlPath) instanceof TFile) {
+			return xmlPath;
+		}
+		if (this.app.vault.getAbstractFileByPath(legacyPath) instanceof TFile) {
+			return legacyPath;
+		}
 		return xmlPath;
-	}	
-
-	activeLeafPath(workspace: Workspace) {
-		const view = workspace.getActiveViewOfType(MarkdownView);
-		return view?.getState().file;
 	}
 
-	activeLeafName(workspace: Workspace) {
-		return workspace.getActiveViewOfType(MarkdownView)?.getDisplayText();
-	}
-
-	async availablePath() {
+	async availablePath(): Promise<{ svgPath: string; xmlPath: string } | undefined> {
 		let basePath: string;
-		
-		// 确保路径格式正确
+
 		switch (this.settings.defaultLocation) {
 			case 'default':
 				// @ts-ignore: Type not documented.
 				basePath = await this.vault.getAvailablePathForAttachments('Diagram', 'svg', this.workspace.getActiveFile())
 				break;
-			case 'current':
-				// 当前文件路径
+			case 'current': {
 				const activeFile = this.workspace.getActiveFile();
-				if (activeFile) {
-					const folderPath = activeFile.parent.path;  // 获取当前文件夹路径
-					basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
-				} else {
+				if (!activeFile) {
 					new Notice('No active file found for the current location setting.');
+					return;
 				}
+				basePath = await this.getAvailablePath('Diagram', 'svg', activeFile.parent?.path);
 				break;
-			case 'custom':
-				// 自定义路径
+			}
+			case 'custom': {
 				const customPath = this.settings.customPath || '';
 				if (!customPath.trim()) {
 					new Notice('Custom path setting is empty. Please specify a valid path.');
 					return;
 				}
-				// @ts-ignore: Type not documented.
 				const folderPath = normalizePath(customPath);
-				// 路径检查
-				let folder = this.app.vault.getFolderByPath(folderPath);
-				if(customPath == '/') {
-					folder = this.vault.getRoot();
-				}
+				const folder = customPath === '/' ? this.vault.getRoot() : this.app.vault.getFolderByPath(folderPath);
 				if (!folder) {
-					basePath = "";
 					new Notice(`The specified custom path does not exist: ${folderPath}`);
-				} else {
-					basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
+					return;
 				}
+				basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
 				break;
+			}
 			default:
 				new Notice('Invalid default location setting.');
+				return;
 		}
-	
+
+		if (!basePath) {
+			return;
+		}
+
 		return {
 			svgPath: basePath,
 			xmlPath: this.getXmlPath(basePath),
 		};
 	}
-	
+
 	async getAvailablePath(filename: string, extension: string, folderPath?: string): Promise<string> {
 		const path = folderPath ? folderPath : this.vault.configDir;
 		let basePath;
@@ -207,20 +186,18 @@ export default class DiagramsNet extends Plugin {
 		}
 		return basePath;
 	}
-	
+
 
 	async attemptNewDiagram() {
-		const { svgPath, xmlPath } = await this.availablePath()
-
-		if(!svgPath) {
+		const paths = await this.availablePath();
+		if (!paths || !paths.svgPath) {
 			return;
 		}
 
 		const fileInfo = {
-			path: this.activeLeafPath(this.workspace),
-			basename: this.activeLeafName(this.workspace),
-			svgPath,
-			xmlPath,
+			basename: this.workspace.getActiveViewOfType(MarkdownView)?.getDisplayText(),
+			svgPath: paths.svgPath,
+			xmlPath: paths.xmlPath,
 			diagramExists: false
 		};
 		this.initView(fileInfo);
@@ -232,8 +209,7 @@ export default class DiagramsNet extends Plugin {
 			new Notice('Diagram is not valid. (Missing .xml data)');
 		} else {
 			const fileInfo = {
-				path: this.activeLeafPath(this.workspace),
-				basename: this.activeLeafName(this.workspace),
+				basename: this.workspace.getActiveViewOfType(MarkdownView)?.getDisplayText(),
 				svgPath: svgFile.path,
 				xmlPath: this.getXmlPath(svgFile.path),
 				diagramExists: true,
@@ -242,7 +218,7 @@ export default class DiagramsNet extends Plugin {
 		}
 	}
 
-	async initView(fileInfo: any) {
+	initView(fileInfo: { basename: string, svgPath: string, xmlPath: string, diagramExists: boolean }) {
 		const hostView = this.workspace.getActiveViewOfType(MarkdownView);
 		new DiagramsView(this.app, hostView, fileInfo, this.ui, this.settings).open();
 	}
@@ -250,14 +226,16 @@ export default class DiagramsNet extends Plugin {
 	handleDeleteFile(file: TAbstractFile) {
 		if (this.isFileValidDiagram(file)) {
 			const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(file.path));
-			this.vault.delete(xmlFile)
+			if (xmlFile instanceof TFile) {
+				this.vault.delete(xmlFile)
+			}
 		}
 	}
 
 	handleRenameFile(file: TAbstractFile, oldname: string) {
 		if (file instanceof TFile && file.extension === 'svg') {
 			const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(oldname));
-			if (xmlFile && xmlFile instanceof TFile && xmlFile.extension === 'xml') {
+			if (xmlFile instanceof TFile && xmlFile.extension === 'xml') {
 				this.vault.rename(xmlFile, this.getXmlPath(file.path))
 			}
 		}
@@ -287,9 +265,6 @@ export default class DiagramsNet extends Plugin {
 		});
 	}
 
-	async onunload() {
-	}
-
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
@@ -299,5 +274,3 @@ export default class DiagramsNet extends Plugin {
 	}
 
 }
-
-

@@ -5,6 +5,7 @@ export default {
     DEFAULT_FOLDER: '附件文件夹',
     CUSTOM_PATH: '自定义',
     CREATE_AND_RENAME: '新建文件保存后重命名',
+    EMBED_URL: 'Diagrams.net 嵌入地址（自托管 / 离线）',
     RENAME: '重命名',
     CANCEL: '取消'
 }

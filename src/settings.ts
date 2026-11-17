@@ -7,12 +7,14 @@ export interface DiagramsSettings {
 	defaultLocation: string,
 	customPath: string,
 	createAndRename: boolean;
+	embedUrl: string;
 }
 
 export const DEFAULT_SETTINGS: DiagramsSettings = {
 	defaultLocation: 'default',
 	customPath: '',
 	createAndRename: true,
+	embedUrl: 'https://embed.diagrams.net/',
 }
 
 export class DiagramsSettingsTab extends PluginSettingTab {
@@ -57,21 +59,22 @@ export class DiagramsSettingsTab extends PluginSettingTab {
 
             new Setting(containerEl)
 			.setName(t("CREATE_AND_RENAME"))
-			// .setDesc(t("Add hover button for accessibility functions in the modal window"))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.createAndRename)
 				.onChange(async (value) => {
 					this.plugin.settings.createAndRename = value;
 					await this.plugin.saveSettings();
-					await this.reloadPlugin();
 				}));
-	}
 
-    async reloadPlugin() {
-		await this.plugin.saveSettings();
-		const app = this.plugin.app as any;
-		await app.plugins.disablePlugin("obsidian-diagrams-net");
-		await app.plugins.enablePlugin("obsidian-diagrams-net");
-		app.setting.openTabById("obsidian-diagrams-net").display();
+		new Setting(containerEl)
+			.setName(t("EMBED_URL"))
+			.setDesc(DEFAULT_SETTINGS.embedUrl)
+			.addText(text => text
+				.setPlaceholder(DEFAULT_SETTINGS.embedUrl)
+				.setValue(this.plugin.settings.embedUrl || '')
+				.onChange(async (value) => {
+					this.plugin.settings.embedUrl = value.trim();
+					await this.plugin.saveSettings();
+				}));
 	}
 }
