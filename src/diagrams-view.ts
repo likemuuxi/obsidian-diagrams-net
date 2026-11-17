@@ -1,4 +1,5 @@
 import { App, MarkdownView, Modal, TFile, Vault, View, Notice } from 'obsidian';
+import { t } from './lang/helpers';
 import { DiagramsEditor } from './diagramsEditor';
 import { RenameModal } from './rename';
 import { DiagramsSettings } from "./settings";
@@ -48,7 +49,7 @@ export default class DiagramsView extends Modal {
         if (this.diagramExists) {
             const xmlFile = this.vault.getAbstractFileByPath(this.xmlPath);
             if (!(xmlFile instanceof TFile)) {
-                new Notice('Diagram data file is missing.');
+                new Notice(t('DIAGRAM_DATA_MISSING'));
                 this.close();
                 return;
             }
@@ -130,7 +131,7 @@ export default class DiagramsView extends Modal {
             this.svgPath = newSvgPath;
             this.fileName = newName;
         } catch (error) {
-            new Notice(`Rename failed: ${error}`);
+            new Notice(`${t('RENAME_FAILED')}: ${error}`);
         }
         this.insertDiagram();
     };
@@ -180,7 +181,7 @@ export default class DiagramsView extends Modal {
         // @ts-ignore: Type not documented.
         const editor = this.hostView?.editor;
         if (!editor) {
-            new Notice('No active markdown editor to insert the diagram into.');
+            new Notice(t('NO_ACTIVE_EDITOR'));
             return;
         }
         const cursor = editor.getCursor();

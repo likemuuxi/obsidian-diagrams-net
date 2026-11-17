@@ -5,6 +5,8 @@
  * - 通过 postMessage 与 embed.diagrams.net 的 iframe 通信
  */
 
+import { t } from './lang/helpers';
+
 const FRAME_ID = 'drawIoDiagramFrame';
 
 // 默认嵌入地址（可在设置中替换为自托管 / 离线部署）
@@ -109,7 +111,7 @@ export class DiagramsEditor {
 				saveAndExit: '1',
 				modified: 'unsavedChanges',
 				xml: this.callbacks.getData() || BLANK_DIAGRAM,
-				title: 'Untitled',
+				title: t('UNTITLED'),
 			});
 		}
 		else if (msg.event === 'autosave') {

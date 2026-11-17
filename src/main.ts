@@ -1,4 +1,5 @@
 import { addIcon, Editor, MarkdownView, Notice, normalizePath, Plugin, TAbstractFile, TFile, Vault, Workspace, Menu, MenuItem } from 'obsidian';
+import { t } from './lang/helpers';
 import { ICON } from './constants';
 import DiagramsView from './diagrams-view';
 import { DEFAULT_SETTINGS, DiagramsSettings, DiagramsSettingsTab } from "./settings";
@@ -40,7 +41,7 @@ export default class DiagramsNet extends Plugin {
 
 		this.addCommand({
 			id: 'app:diagrams-net-new-diagram',
-			name: 'New diagram',
+			name: t('NEW_DIAGRAM'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
@@ -54,7 +55,7 @@ export default class DiagramsNet extends Plugin {
 			hotkeys: []
 		});
 
-		this.addRibbonIcon("diagram", "Insert new diagram", () => this.attemptNewDiagram() );
+		this.addRibbonIcon("diagram", t('INSERT_NEW_DIAGRAM'), () => this.attemptNewDiagram() );
 
 		this.registerEvent(
 			this.app.workspace.on("file-menu", this.handleFileMenu, this)
@@ -129,7 +130,7 @@ export default class DiagramsNet extends Plugin {
 			case 'current': {
 				const activeFile = this.workspace.getActiveFile();
 				if (!activeFile) {
-					new Notice('No active file found for the current location setting.');
+					new Notice(t('NO_ACTIVE_FILE'));
 					return;
 				}
 				basePath = await this.getAvailablePath('Diagram', 'svg', activeFile.parent?.path);
@@ -138,20 +139,20 @@ export default class DiagramsNet extends Plugin {
 			case 'custom': {
 				const customPath = this.settings.customPath || '';
 				if (!customPath.trim()) {
-					new Notice('Custom path setting is empty. Please specify a valid path.');
+					new Notice(t('CUSTOM_PATH_EMPTY'));
 					return;
 				}
 				const folderPath = normalizePath(customPath);
 				const folder = customPath === '/' ? this.vault.getRoot() : this.app.vault.getFolderByPath(folderPath);
 				if (!folder) {
-					new Notice(`The specified custom path does not exist: ${folderPath}`);
+					new Notice(`${t('CUSTOM_PATH_NOT_EXIST')}: ${folderPath}`);
 					return;
 				}
 				basePath = await this.getAvailablePath('Diagram', 'svg', folderPath);
 				break;
 			}
 			default:
-				new Notice('Invalid default location setting.');
+				new Notice(t('INVALID_LOCATION_SETTING'));
 				return;
 		}
 
@@ -206,7 +207,7 @@ export default class DiagramsNet extends Plugin {
 
 	attemptEditDiagram(svgFile: TFile) {
 		if (!this.isFileValidDiagram(svgFile)) {
-			new Notice('Diagram is not valid. (Missing .xml data)');
+			new Notice(t('DIAGRAM_INVALID'));
 		} else {
 			const fileInfo = {
 				basename: this.workspace.getActiveViewOfType(MarkdownView)?.getDisplayText(),
@@ -245,7 +246,7 @@ export default class DiagramsNet extends Plugin {
 		if (file instanceof TFile && file.extension === 'svg') {
 			menu.addItem((item) => {
 				item
-					.setTitle("Edit diagram")
+					.setTitle(t('EDIT_DIAGRAM'))
 					.setIcon("diagram")
 					.onClick(async () => {
 						this.attemptEditDiagram(file);
@@ -257,7 +258,7 @@ export default class DiagramsNet extends Plugin {
 	handleEditorMenu(menu: Menu, editor: Editor, view: MarkdownView) {
 		menu.addItem((item: MenuItem) => {
 			item
-				.setTitle("Insert new diagram")
+				.setTitle(t('INSERT_NEW_DIAGRAM'))
 				.setIcon("diagram")
 				.onClick(async () => {
 					this.attemptNewDiagram();
