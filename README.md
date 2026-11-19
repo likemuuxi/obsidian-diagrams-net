@@ -7,6 +7,17 @@ A plugin for [Obsidian](https://obsidian.md/) for inserting and editing [diagram
 
 ![1726331811989-20240915_003406](https://github.com/user-attachments/assets/71aced54-474f-430f-afb3-cda153b144e1)
 
+## AI Assistant
+
+The editor opens with an AI panel on the right side. Describe a diagram in natural language and it is generated directly onto the canvas; if the canvas already has content, instructions are applied to the current diagram (e.g. "add a reject branch to the review node").
+
+- **Works with any OpenAI-compatible API** — configure endpoint / model / API key in the plugin settings (OpenAI, DeepSeek, Kimi, OpenRouter, local Ollama, …).
+- **Multi-turn refinement** — conversation history is sent back to the model, so iterative instructions like "make it simpler" or "same style" work.
+- **Undo & regenerate** — every AI application can be reverted with one click (the canvas undo stack is reset by reloads, so the plugin keeps its own snapshots), and a "Regenerate" button retries from the pre-generation state.
+- **Template chips** — one-click starters for flowchart, swimlane, sequence, ER, UML class and mind map diagrams.
+- **XML view** — inspect or hand-edit the diagram XML and apply it with the same auto-repair pipeline used for AI output.
+- **Safety guards** — overly large diagrams are rejected before being sent to the model; multi-page diagram files keep their other pages when the AI edits page 1.
+
 > ## ⚠️ **Caveats**
 > As Obsidian itself has an API that is under development, so is this plugin. There are some things you should be aware of if you are using it:
 > 

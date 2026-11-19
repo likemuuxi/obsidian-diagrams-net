@@ -21,3 +21,523 @@
 .rename-diagrams-modal .rename-button:hover {
     background-color: var(--interactive-accent-hover) !important;
 }
+
+/* ---------- 编辑器模态框：左画布 + 右 AI 面板 ---------- */
+
+/* Modal 外壳：与未加 AI 功能前的原版一致——仅设 100vw/100vh，边框、圆角、内边距沿用 Obsidian 默认 */
+.modal.diagrams-modal-container {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* 隐藏 Obsidian 默认关闭按钮（关闭入口只保留 drawio 编辑器自带的退出按钮 + Esc） */
+.diagrams-modal-root .modal-close-button {
+    display: none;
+}
+
+/* 主内容区：水平 flex，编辑器与 AI 面板的共同父容器（Modal 与标签页共用） */
+.diagrams-editor-content {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 左侧画布：占满 AI 面板以外的全部空间；与边缘及 AI 面板留间隔，圆角卡片样式 */
+.diagrams-editor-area {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    margin: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+}
+
+/* ---------- AI 对话面板 ---------- */
+
+/* 右侧 AI 面板：纵向 flex，与编辑器等高；折叠时退出布局，编辑器自动占满 */
+.diagrams-ai-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 320px;
+    width: 320px;
+    max-width: 45vw;
+    min-height: 0;
+    position: relative; /* 拖拽条绝对定位的基准 */
+    /* 与边缘留出间隙，让圆角可见；overflow 裁剪子元素，配合圆角 */
+    margin: 8px 8px 8px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+    background-color: var(--background-secondary);
+}
+
+/* 左缘拖拽条：拖动调整面板宽度 */
+.diagrams-ai-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 5px;
+    cursor: col-resize;
+    z-index: 5;
+}
+
+.diagrams-ai-resizer:hover {
+    background-color: var(--interactive-accent);
+    opacity: 0.6;
+}
+
+/* 拖拽调宽期间：iframe 不拦截指针事件，保证拖动流畅、松开正常释放 */
+.diagrams-editor-content.is-resizing iframe {
+    pointer-events: none;
+}
+
+/* 拖拽调宽期间：去掉宽度过渡，让面板即时跟手（过渡仅用于切 tab 时的宽度动画） */
+.diagrams-editor-content.is-resizing .diagrams-ai-panel {
+    transition: none;
+}
+
+/* 标签页视图：内容铺满，去掉 view-content 默认内边距 */
+.workspace-leaf-content[data-type="diagrams-net-editor"] .view-content {
+    padding: 0;
+    overflow: hidden;
+}
+
+/* 收起态：面板塌缩为右缘窄条，内容隐藏，整条可点击展开 */
+.diagrams-ai-panel.is-collapsed {
+    flex: 0 0 32px;
+    width: 32px;
+    cursor: pointer;
+}
+
+.diagrams-ai-panel {
+    transition: flex-basis 150ms ease, width 150ms ease;
+}
+
+.diagrams-ai-panel.is-collapsed > *:not(.diagrams-ai-rail) {
+    display: none;
+}
+
+.diagrams-ai-rail {
+    display: none;
+}
+
+.diagrams-ai-panel.is-collapsed .diagrams-ai-rail {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    user-select: none;
+    transition: background-color 100ms ease, color 100ms ease;
+}
+
+.diagrams-ai-panel.is-collapsed .diagrams-ai-rail svg {
+    width: 18px;
+    height: 18px;
+}
+
+.diagrams-ai-panel.is-collapsed .diagrams-ai-rail:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.diagrams-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    font-weight: var(--font-bold);
+    border-bottom: none;
+}
+
+/* header 右侧操作区：历史按钮 + 折叠按钮（独占一行时贴最右） */
+.diagrams-ai-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+/* header 图标按钮（历史 / 折叠）：透明背景，悬浮才有底色 */
+.diagrams-ai-header-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: var(--radius-s);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 100ms ease, background-color 100ms ease;
+}
+
+.diagrams-ai-header-icon:hover:not(:disabled) {
+    color: var(--text-normal) !important;
+    background-color: var(--background-modifier-hover) !important;
+}
+
+.diagrams-ai-header-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.diagrams-ai-header-icon:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* 对话条目内的操作按钮（撤销 / 重新生成）：纯图标 + tooltip，无边框无阴影，悬浮才出现底色 */
+.diagrams-ai-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: var(--radius-s);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 100ms ease, background-color 100ms ease;
+}
+
+.diagrams-ai-action-btn:hover {
+    color: var(--text-normal) !important;
+    background-color: var(--background-modifier-hover) !important;
+}
+
+.diagrams-ai-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 对话视图容器：撑满面板剩余高度 */
+.diagrams-ai-view {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* 版本历史弹窗：AI 修改前的持久化快照，点击恢复 */
+.diagrams-ai-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 340px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 2px;
+}
+
+.diagrams-ai-history-empty {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    padding: 12px 4px;
+}
+
+.diagrams-ai-history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border-radius: var(--radius-m);
+    background-color: var(--background-modifier-hover);
+}
+
+.diagrams-ai-history-time {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.diagrams-ai-history-prompt {
+    font-size: var(--font-ui-small);
+    word-break: break-word;
+}
+
+.diagrams-ai-history-restore {
+    align-self: flex-start;
+    font-size: var(--font-ui-smaller);
+    padding: 2px 10px;
+}
+
+/* 推理模型思考过程：折叠块，默认收起 */
+.diagrams-ai-reasoning {
+    align-self: flex-start;
+    max-width: 95%;
+    margin: 2px 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-m);
+    border-left: 2px solid var(--text-faint);
+    background-color: var(--background-modifier-hover);
+}
+
+.diagrams-ai-reasoning summary {
+    cursor: pointer;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.diagrams-ai-reasoning-body {
+    margin-top: 4px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* 待发送图片预览：缩略图 + 移除按钮 */
+.diagrams-ai-image-preview {
+    position: relative;
+    display: inline-flex;
+    padding: 4px;
+    border-radius: var(--radius-m);
+    border: 1px dashed var(--background-modifier-border-hover);
+}
+
+.diagrams-ai-image-preview img {
+    height: 64px;
+    max-width: 180px;
+    object-fit: contain;
+    border-radius: var(--radius-s);
+    display: block;
+}
+
+.diagrams-ai-image-remove {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diagrams-ai-history {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.diagrams-ai-msg {
+    padding: 6px 10px;
+    border-radius: var(--radius-m);
+    border: none;
+    box-shadow: none;
+    font-size: var(--font-ui-small);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.diagrams-ai-msg.user {
+    align-self: flex-end;
+    max-width: 90%;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.diagrams-ai-msg.status {
+    align-self: flex-start;
+    max-width: 95%;
+    color: var(--text-muted);
+    background-color: var(--background-modifier-hover);
+}
+
+.diagrams-ai-msg.status.ok {
+    color: var(--text-success, #4caf50);
+}
+
+.diagrams-ai-msg.status.err {
+    color: var(--text-error, #e53935);
+    background-color: var(--background-modifier-error);
+}
+
+/* 成功状态消息内的操作按钮行（撤销 / 重新生成） */
+.diagrams-ai-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+/* 图→文字结果正文：Markdown 源文本，可选中复制，超高滚动 */
+.diagrams-ai-desc-text {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: var(--radius-s);
+    border-left: 2px solid var(--background-modifier-border-hover);
+    background-color: var(--background-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 280px;
+    overflow-y: auto;
+    user-select: text;
+}
+
+/* 模板快捷按钮：横向可滚动的胶囊文字行，位于历史与输入框之间 */
+.diagrams-ai-templates {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    flex-shrink: 0;
+    margin: 8px 10px 8px 10px;
+    padding: 0 0px 8px 0px;
+    overflow-x: auto;
+}
+
+.diagrams-ai-chip {
+    flex-shrink: 0;
+    padding: 2px 10px;
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 999px;
+    box-shadow: none;
+    cursor: pointer;
+    transition: color 100ms ease, background-color 100ms ease;
+}
+
+.diagrams-ai-chip:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+/* 个人模板 chip（P10）：虚线边框 + 强调色，与内置 Quick Examples 区分 */
+.diagrams-ai-chip.is-custom {
+    border-style: dashed;
+    color: var(--text-accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.diagrams-ai-chip.is-custom:hover {
+    color: var(--text-accent);
+}
+
+/* chip 内嵌的删除 × */
+.diagrams-ai-chip-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--text-faint);
+}
+
+.diagrams-ai-chip-delete:hover {
+    background: var(--background-modifier-error);
+    color: var(--text-on-accent);
+}
+
+/* "存为模板"入口按钮 */
+.diagrams-ai-chip-add {
+    font-weight: 700;
+}
+
+/* 模板命名弹窗（P10） */
+.diagrams-tpl-modal input.diagrams-tpl-input {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.diagrams-tpl-modal button {
+    margin-right: 8px;
+}
+
+/* 输入区：输入框与发送按钮合并为一个整体 */
+.diagrams-ai-input {
+    flex-shrink: 0;
+    padding: 10px;
+}
+
+.diagrams-ai-prompt-wrap {
+    position: relative;
+    border-radius: var(--radius-m);
+    background-color: var(--background-modifier-form-field);
+    transition: box-shadow 100ms ease;
+}
+
+.diagrams-ai-prompt-wrap:focus-within {
+    box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.diagrams-ai-prompt {
+    display: block;
+    width: 100%;
+    min-height: 4.5em;
+    resize: vertical;
+    padding: 8px 8px 38px 10px;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.diagrams-ai-prompt:focus {
+    border: none;
+    box-shadow: none;
+}
+
+/* 发送按钮：内嵌在输入框右下角的圆形图标按钮 */
+.diagrams-ai-send {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 50%;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    box-shadow: none;
+    border: none;
+}
+
+.diagrams-ai-send svg {
+    width: 14px;
+    height: 14px;
+}
+
+.diagrams-ai-send:hover:not(:disabled) {
+    background-color: var(--interactive-accent-hover);
+}
+
+.diagrams-ai-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

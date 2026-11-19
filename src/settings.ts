@@ -8,6 +8,11 @@ export interface DiagramsSettings {
 	customPath: string,
 	createAndRename: boolean;
 	embedUrl: string;
+	aiEndpoint: string;
+	aiModel: string;
+	aiApiKey: string;
+	/** 个人模板库（P10）：把当前画布 XML 以命名模板形式存进插件 data */
+	customTemplates: Array<{ name: string; xml: string }>;
 }
 
 export const DEFAULT_SETTINGS: DiagramsSettings = {
@@ -15,6 +20,10 @@ export const DEFAULT_SETTINGS: DiagramsSettings = {
 	customPath: '',
 	createAndRename: true,
 	embedUrl: 'https://embed.diagrams.net/',
+	aiEndpoint: 'https://api.openai.com/v1',
+	aiModel: 'gpt-4o',
+	aiApiKey: '',
+	customTemplates: [],
 }
 
 export class DiagramsSettingsTab extends PluginSettingTab {
@@ -76,5 +85,40 @@ export class DiagramsSettingsTab extends PluginSettingTab {
 					this.plugin.settings.embedUrl = value.trim();
 					await this.plugin.saveSettings();
 				}));
+
+		containerEl.createEl('h3', { text: t('AI_SETTINGS') });
+
+		new Setting(containerEl)
+			.setName(t('AI_ENDPOINT'))
+			.setDesc(t('AI_ENDPOINT_DESC'))
+			.addText(text => text
+				.setPlaceholder(DEFAULT_SETTINGS.aiEndpoint)
+				.setValue(this.plugin.settings.aiEndpoint || '')
+				.onChange(async (value) => {
+					this.plugin.settings.aiEndpoint = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(t('AI_MODEL'))
+			.setDesc(t('AI_MODEL_DESC'))
+			.addText(text => text
+				.setPlaceholder(DEFAULT_SETTINGS.aiModel)
+				.setValue(this.plugin.settings.aiModel || '')
+				.onChange(async (value) => {
+					this.plugin.settings.aiModel = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(t('AI_API_KEY'))
+			.addText(text => {
+				text.inputEl.type = 'password';
+				text.setValue(this.plugin.settings.aiApiKey || '')
+					.onChange(async (value) => {
+						this.plugin.settings.aiApiKey = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
 	}
 }

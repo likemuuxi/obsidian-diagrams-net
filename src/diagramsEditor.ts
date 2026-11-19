@@ -23,6 +23,8 @@ export interface DiagramsEditorCallbacks {
 	onExit: () => void;
 	/** 读取已有图表数据（返回 xml 字符串，新建时返回空即可） */
 	getData: () => string;
+	/** 图表 XML 变化（autosave 上报），用于 AI 修改时获取当前状态 */
+	onXmlUpdate?: (xml: string) => void;
 }
 
 export class DiagramsEditor {
@@ -83,6 +85,27 @@ export class DiagramsEditor {
 		}
 	}
 
+	/** 把新 XML 推送到编辑器实时刷新画布（AI 生成/修改后调用） */
+	reloadXml(xml: string) {
+		this.postMessage({
+			action: 'load',
+			noSaveBtn: 1,
+			autosave: 1,
+			saveAndExit: '1',
+			modified: 'unsavedChanges',
+			xml,
+		});
+	}
+
+	/**
+	 * 把完整文档 XML 差异合并进当前画布（drawio 的 merge 动作：
+	 * 与当前文档做 cell 级 diff 后只应用差异，不整图刷新）。
+	 * 注意 xml 必须是完整文档——当前画布有而传入文档没有的 cell 会被删除。
+	 */
+	mergeXml(xml: string) {
+		this.postMessage({ action: 'merge', xml });
+	}
+
 	private handleMessageEvent(evt: MessageEvent) {
 		if (
 			this.frame !== null &&
@@ -104,10 +127,12 @@ export class DiagramsEditor {
 
 	private handleMessage(msg: any) {
 		if (msg.event === 'init') {
+			// autosave 打开：用户手动编辑时通过 autosave 事件同步最新 XML，
+			// AI 修改才有准确的"当前状态"作为输入
 			this.postMessage({
 				action: 'load',
 				noSaveBtn: 1,
-				autosave: 0,
+				autosave: 1,
 				saveAndExit: '1',
 				modified: 'unsavedChanges',
 				xml: this.callbacks.getData() || BLANK_DIAGRAM,
@@ -115,7 +140,10 @@ export class DiagramsEditor {
 			});
 		}
 		else if (msg.event === 'autosave') {
-			// 忽略自动保存
+			// 跟踪画布最新 XML
+			if (msg.xml) {
+				this.callbacks.onXmlUpdate?.(msg.xml);
+			}
 		}
 		else if (msg.event === 'save') {
 			// 只导出 svg（png 导出从未被使用，白白增加保存耗时）

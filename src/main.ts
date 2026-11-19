@@ -2,6 +2,7 @@ import { addIcon, Editor, MarkdownView, Notice, normalizePath, Plugin, TAbstract
 import { t } from './lang/helpers';
 import { ICON } from './constants';
 import DiagramsView from './diagrams-view';
+import { DiagramsTabView, VIEW_TYPE_DIAGRAMS } from './diagrams-tab-view';
 import { DEFAULT_SETTINGS, DiagramsSettings, DiagramsSettingsTab } from "./settings";
 
 export default class DiagramsNet extends Plugin {
@@ -30,14 +31,20 @@ export default class DiagramsNet extends Plugin {
 			this.handleEmbedClick(evt);
 		});
 
+		// 捕获阶段监听，先于 Obsidian 核心（Alt+点击放大图片）执行；
+		// 命中有效图表时阻断默认行为，避免同时打开放大预览
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			// 按住 Alt 键点击时编辑嵌入图表
-			if (evt.altKey) {
-				this.handleEmbedClick(evt);
+			if (evt.altKey && this.handleEmbedClick(evt)) {
+				evt.preventDefault();
+				evt.stopPropagation();
 			}
-		});
+		}, { capture: true });
 
 		addIcon("diagram", ICON);
+
+		// 创建流：标签页编辑器视图（侧边栏"创建新图表"按钮打开）
+		this.registerView(VIEW_TYPE_DIAGRAMS, (leaf) => new DiagramsTabView(leaf, this));
 
 		this.addCommand({
 			id: 'app:diagrams-net-new-diagram',
@@ -55,7 +62,24 @@ export default class DiagramsNet extends Plugin {
 			hotkeys: []
 		});
 
-		this.addRibbonIcon("diagram", t('INSERT_NEW_DIAGRAM'), () => this.attemptNewDiagram() );
+		this.addRibbonIcon("diagram", t('CREATE_NEW_DIAGRAM'), () => this.openDiagramTab());
+
+		// 从当前笔记 / 选中文本生成图表（P7）：文本作为上下文预填 AI 面板
+		this.addCommand({
+			id: 'app:diagrams-net-diagram-from-note',
+			name: t('COMMAND_DIAGRAM_FROM_NOTE'),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (view) {
+					if (!checking) {
+						void this.diagramFromEditorText(view, view.editor);
+					}
+					return true;
+				}
+				return false;
+			},
+			hotkeys: []
+		});
 
 		this.registerEvent(
 			this.app.workspace.on("file-menu", this.handleFileMenu, this)
@@ -76,7 +100,8 @@ export default class DiagramsNet extends Plugin {
 	}
 
 	// 处理笔记中嵌入图表的点击/双击编辑；src 可能带别名或子路径，如 diagram.svg|300
-	handleEmbedClick(evt: MouseEvent) {
+	// 返回是否命中有效图表：命中时由调用方阻止 Obsidian 默认行为（如 Alt+点击放大）
+	handleEmbedClick(evt: MouseEvent): boolean {
 		let target = evt.target as HTMLElement;
 		if (target.tagName === "IMG") {
 			const match = target.closest(".internal-embed");
@@ -85,15 +110,18 @@ export default class DiagramsNet extends Plugin {
 			}
 		}
 		if (!target.classList || !target.classList.contains("internal-embed")) {
-			return;
+			return false;
 		}
 		const src = (target.getAttribute("src") || "").split('|')[0].split('#')[0].trim();
 		if (src.toLowerCase().endsWith('.svg')) {
 			const file = this.app.metadataCache.getFirstLinkpathDest(src, "");
-			if (file instanceof TFile) {
+			// 仅拦截有效图表；普通 svg 图片保留 Obsidian 原生 Alt+点击放大
+			if (file instanceof TFile && this.isFileValidDiagram(file)) {
 				this.attemptEditDiagram(file);
+				return true;
 			}
 		}
+		return false;
 	}
 
 	isFileValidDiagram(file: TAbstractFile) {
@@ -189,7 +217,7 @@ export default class DiagramsNet extends Plugin {
 	}
 
 
-	async attemptNewDiagram() {
+	async attemptNewDiagram(sourceText?: string) {
 		const paths = await this.availablePath();
 		if (!paths || !paths.svgPath) {
 			return;
@@ -201,7 +229,24 @@ export default class DiagramsNet extends Plugin {
 			xmlPath: paths.xmlPath,
 			diagramExists: false
 		};
-		this.initView(fileInfo);
+		this.initView(fileInfo, sourceText);
+	}
+
+	/** 创建流：在标签页中打开新图表编辑器；保存仅落盘，不插入当前笔记 */
+	async openDiagramTab() {
+		const paths = await this.availablePath();
+		if (!paths || !paths.svgPath) {
+			return;
+		}
+		const leaf = this.workspace.getLeaf(true);
+		// 直接以带 state 的实例打开，不依赖 setViewState 的 setState 时序
+		const view = new DiagramsTabView(leaf, this, {
+			fileBasename: paths.svgPath.split('/').pop()?.slice(0, -4) ?? 'Diagram',
+			svgPath: paths.svgPath,
+			xmlPath: paths.xmlPath,
+			diagramExists: false,
+		});
+		await leaf.open(view);
 	}
 
 
@@ -219,9 +264,10 @@ export default class DiagramsNet extends Plugin {
 		}
 	}
 
-	initView(fileInfo: { basename: string, svgPath: string, xmlPath: string, diagramExists: boolean }) {
+	initView(fileInfo: { basename: string, svgPath: string, xmlPath: string, diagramExists: boolean }, sourceText?: string) {
 		const hostView = this.workspace.getActiveViewOfType(MarkdownView);
-		new DiagramsView(this.app, hostView, fileInfo, this.ui, this.settings).open();
+		new DiagramsView(this.app, hostView, fileInfo, this.ui, this.settings, this.manifest.dir,
+			() => this.saveSettings(), sourceText).open();
 	}
 
 	handleDeleteFile(file: TAbstractFile) {
@@ -264,6 +310,35 @@ export default class DiagramsNet extends Plugin {
 					this.attemptNewDiagram();
 				});
 		});
+		menu.addItem((item: MenuItem) => {
+			item
+				.setTitle(editor.somethingSelected() ? t('GENERATE_FROM_SELECTION') : t('GENERATE_FROM_NOTE'))
+				.setIcon("diagram")
+				.onClick(async () => {
+					void this.diagramFromEditorText(view, editor);
+				});
+		});
+	}
+
+	/** 取选中文本（无选区取整篇笔记正文）作为上下文，新建图表并预填 AI 输入框 */
+	async diagramFromEditorText(view: MarkdownView, editor?: Editor) {
+		let text = '';
+		if (editor && editor.somethingSelected()) {
+			text = editor.getSelection();
+		} else if (view.file) {
+			text = await this.vault.cachedRead(view.file);
+		}
+		text = text.trim();
+		if (!text) {
+			new Notice(t('NOTE_TEXT_EMPTY'));
+			return;
+		}
+		// 与喂给模型的图表 XML 同量级的长度上限，超出截断避免撑爆上下文
+		if (text.length > 100_000) {
+			text = text.slice(0, 100_000);
+			new Notice(t('NOTE_TEXT_TRUNCATED'));
+		}
+		await this.attemptNewDiagram(t('AI_NOTE_PROMPT_PREFIX') + text);
 	}
 
 	async loadSettings() {
@@ -272,6 +347,11 @@ export default class DiagramsNet extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	onunload() {
+		// 卸载时关闭所有图表编辑器标签页，避免残留未注册视图
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_DIAGRAMS);
 	}
 
 }
